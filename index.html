@@ -161,6 +161,9 @@
       border: 1px solid rgba(255, 255, 255, .08);
     }
 
+    #puzzleFrame {
+  transition: aspect-ratio .25s ease;
+}
     /* Puzzle board */
     #puzzleBoard {
       touch-action: manipulation;
@@ -452,9 +455,9 @@
             class="rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none transition focus:border-indigo-400"
             aria-label="Puzzle difficulty"
           >
-            <option value="3">Easy · 3×3</option>
-            <option value="4" selected>Medium · 4×4</option>
-            <option value="5">Hard · 5×5</option>
+            <option value="3">Easy</option>
+<option value="4" selected>Medium</option>
+<option value="5">Hard</option>
           </select>
 
           <button
@@ -474,7 +477,10 @@
         <!-- Puzzle -->
         <div class="glass rounded-3xl p-3 shadow-2xl shadow-black/30 sm:p-5">
 
-          <div class="relative mx-auto aspect-square w-full max-w-[760px]">
+          <div
+  id="puzzleFrame"
+  class="relative mx-auto w-full max-w-[760px]"
+>
 <!-- Compact victory bar -->
 <div
   id="victoryOverlay"
@@ -818,12 +824,14 @@
     // ---------------------------------------------------------
 
     const state = {
-      imageSrc: DEFAULT_IMAGE,
-      imageTitle: "Featured Picture",
+  imageSrc: DEFAULT_IMAGE,
+  imageTitle: "Featured Picture",
 
-      gridSize: 4,
+  gridSize: 4,
+  gridColumns: 4,
+  gridRows: 4,
 
-      tiles: [],
+  tiles: [],
       selectedTile: null,
 
       moves: 0,
@@ -844,6 +852,8 @@
      */
 
     const board = document.getElementById("puzzleBoard");
+    const puzzleFrame =
+  document.getElementById("puzzleFrame");
 
     const difficulty =
       document.getElementById("difficulty");
@@ -1007,23 +1017,21 @@ function celebrateVictory() {
 }
 
     function updateStats() {
+  movesStat.textContent = state.moves;
 
-      movesStat.textContent = state.moves;
+  sizeStat.textContent =
+    `${state.gridColumns}×${state.gridRows}`;
 
-      sizeStat.textContent =
-        `${state.gridSize}×${state.gridSize}`;
+  if (state.startTime) {
+    const elapsed =
+      Math.floor(
+        (Date.now() - state.startTime) / 1000
+      );
 
-      if (state.startTime) {
-
-        const elapsed =
-          Math.floor(
-            (Date.now() - state.startTime) / 1000
-          );
-
-        timeStat.textContent =
-          formatTime(elapsed);
-      }
-    }
+    timeStat.textContent =
+      formatTime(elapsed);
+  }
+}
 
 
     function startTimer() {
@@ -1189,18 +1197,92 @@ function celebrateVictory() {
      * =========================================================
      */
 
+    function calculateGrid(width, height) {
+  const ratio = width / height;
+
+  let columns;
+  let rows;
+
+  /*
+   * Easy:
+   * roughly 12 pieces
+   */
+  if (state.gridSize === 3) {
+
+    if (ratio > 1.35) {
+      columns = 4;
+      rows = 3;
+    } else if (ratio < 0.75) {
+      columns = 3;
+      rows = 4;
+    } else {
+      columns = 3;
+      rows = 3;
+    }
+
+  /*
+   * Medium:
+   * roughly 16–24 pieces
+   */
+  } else if (state.gridSize === 4) {
+
+    if (ratio >= 1.55) {
+      columns = 6;
+      rows = 4;
+    } else if (ratio >= 1.20) {
+      columns = 4;
+      rows = 3;
+    } else if (ratio <= 0.65) {
+      columns = 4;
+      rows = 6;
+    } else if (ratio <= 0.83) {
+      columns = 3;
+      rows = 4;
+    } else {
+      columns = 4;
+      rows = 4;
+    }
+
+  /*
+   * Hard:
+   * roughly 25–40 pieces
+   */
+  } else {
+
+    if (ratio >= 1.55) {
+      columns = 8;
+      rows = 5;
+    } else if (ratio >= 1.20) {
+      columns = 5;
+      rows = 4;
+    } else if (ratio <= 0.65) {
+      columns = 5;
+      rows = 8;
+    } else if (ratio <= 0.83) {
+      columns = 4;
+      rows = 5;
+    } else {
+      columns = 5;
+      rows = 5;
+    }
+  }
+
+  state.gridColumns = columns;
+  state.gridRows = rows;
+}
+
     function createSolvedTiles() {
 
-      const total =
-        state.gridSize *
-        state.gridSize;
+  const total =
+    state.gridColumns *
+    state.gridRows;
 
-      state.tiles =
-        Array.from(
-          { length: total },
-          (_, index) => index
-        );
-    }
+  state.tiles =
+    Array.from(
+      { length: total },
+      (_, index) => index
+    );
+}
 
 
     function shuffleArray(array) {
@@ -1295,155 +1377,170 @@ if (confettiContainer) {
 
     function renderBoard() {
 
-      board.innerHTML = "";
+  board.innerHTML = "";
 
-      board.style.gridTemplateColumns =
-        `repeat(${state.gridSize}, minmax(0, 1fr))`;
+  /*
+   * Make the board match the image proportions.
+   */
+  board.style.gridTemplateColumns =
+    `repeat(${state.gridColumns}, minmax(0, 1fr))`;
 
-      const total =
-        state.gridSize *
-        state.gridSize;
+  board.style.gridTemplateRows =
+    `repeat(${state.gridRows}, minmax(0, 1fr))`;
 
-      const backgroundSize =
-        `${state.gridSize * 100}% ${state.gridSize * 100}%`;
+  /*
+   * Make the outer frame have the same
+   * aspect ratio as the puzzle.
+   */
+  if (puzzleFrame) {
+    puzzleFrame.style.aspectRatio =
+      `${state.gridColumns} / ${state.gridRows}`;
+  }
 
+  const total =
+    state.gridColumns *
+    state.gridRows;
 
-      state.tiles.forEach(
-        (originalIndex, currentIndex) => {
+  /*
+   * Background image dimensions.
+   *
+   * For example:
+   * 6 × 4 puzzle = 600% × 400%
+   */
+  const backgroundSize =
+    `${state.gridColumns * 100}% ${state.gridRows * 100}%`;
 
-          const tile =
-            document.createElement("button");
+  state.tiles.forEach(
+    (originalIndex, currentIndex) => {
 
-          tile.type = "button";
+      const tile =
+        document.createElement("button");
 
-          tile.className =
-            "puzzle-tile focus:outline-none";
+      tile.type = "button";
 
-          if (
-            state.selectedTile === currentIndex
-          ) {
+      tile.className =
+        "puzzle-tile focus:outline-none";
 
-            tile.classList.add(
-              "selected"
-            );
-          }
+      if (
+        state.selectedTile === currentIndex
+      ) {
+        tile.classList.add("selected");
+      }
 
+      /*
+       * Find the original position of this tile.
+       */
+      const originalRow =
+        Math.floor(
+          originalIndex /
+          state.gridColumns
+        );
 
-          const originalRow =
-            Math.floor(
-              originalIndex /
-              state.gridSize
-            );
+      const originalColumn =
+        originalIndex %
+        state.gridColumns;
 
-          const originalColumn =
-            originalIndex %
-            state.gridSize;
+      /*
+       * Use the original image as the
+       * background and show only this tile's
+       * section.
+       */
+      tile.style.backgroundImage =
+        `url("${state.imageSrc}")`;
 
+      tile.style.backgroundSize =
+        backgroundSize;
 
-          /*
-           * CSS background positioning creates the
-           * individual image slices without having to
-           * physically crop the image.
-           */
+      tile.style.backgroundPosition =
+        `${(
+          originalColumn *
+          100 /
+          (state.gridColumns - 1)
+        ) || 0}% ${(
+          originalRow *
+          100 /
+          (state.gridRows - 1)
+        ) || 0}%`;
 
-          tile.style.backgroundImage =
-            `url("${state.imageSrc}")`;
+      tile.style.backgroundRepeat =
+        "no-repeat";
 
-          tile.style.backgroundSize =
-            backgroundSize;
+      tile.setAttribute(
+        "aria-label",
+        `Puzzle tile ${currentIndex + 1}`
+      );
 
-          tile.style.backgroundPosition =
-            `${(
-              originalColumn *
-              100 /
-              (state.gridSize - 1)
-            ) || 0}% ${(
-              originalRow *
-              100 /
-              (state.gridSize - 1)
-            ) || 0}%`;
+      /*
+       * Click to swap.
+       */
+      tile.addEventListener(
+        "click",
+        () => handleTileClick(currentIndex)
+      );
 
+      /*
+       * Desktop drag and drop.
+       */
+      tile.draggable = true;
 
-          tile.setAttribute(
-            "aria-label",
-            `Puzzle tile ${currentIndex + 1}`
+      tile.addEventListener(
+        "dragstart",
+        event => {
+
+          event.dataTransfer.setData(
+            "text/plain",
+            currentIndex
           );
 
-
-          tile.addEventListener(
-            "click",
-            () => handleTileClick(currentIndex)
+          tile.classList.add(
+            "dragging"
           );
-
-
-          /*
-           * Basic drag-and-drop support for desktop.
-           */
-
-          tile.draggable = true;
-
-          tile.addEventListener(
-            "dragstart",
-            event => {
-
-              event.dataTransfer.setData(
-                "text/plain",
-                currentIndex
-              );
-
-              tile.classList.add(
-                "dragging"
-              );
-            }
-          );
-
-
-          tile.addEventListener(
-            "dragend",
-            () => {
-
-              tile.classList.remove(
-                "dragging"
-              );
-            }
-          );
-
-
-          tile.addEventListener(
-            "dragover",
-            event => {
-              event.preventDefault();
-            }
-          );
-
-
-          tile.addEventListener(
-            "drop",
-            event => {
-
-              event.preventDefault();
-
-              const from =
-                Number(
-                  event.dataTransfer.getData(
-                    "text/plain"
-                  )
-                );
-
-              swapTiles(
-                from,
-                currentIndex
-              );
-            }
-          );
-
-
-          board.appendChild(tile);
         }
       );
 
-      updateStats();
+      tile.addEventListener(
+        "dragend",
+        () => {
+
+          tile.classList.remove(
+            "dragging"
+          );
+        }
+      );
+
+      tile.addEventListener(
+        "dragover",
+        event => {
+          event.preventDefault();
+        }
+      );
+
+      tile.addEventListener(
+        "drop",
+        event => {
+
+          event.preventDefault();
+
+          const from =
+            Number(
+              event.dataTransfer.getData(
+                "text/plain"
+              )
+            );
+
+          swapTiles(
+            from,
+            currentIndex
+          );
+        }
+      );
+
+      board.appendChild(tile);
     }
+  );
+
+  updateStats();
+}
 
 
     /*
@@ -1576,24 +1673,58 @@ if (confettiContainer) {
 
     function startNewPuzzle() {
 
-      createSolvedTiles();
+  createSolvedTiles();
 
-      shufflePuzzle();
+  shufflePuzzle();
 
-      puzzleTitle.textContent =
-        state.imageTitle;
+  puzzleTitle.textContent =
+    state.imageTitle;
 
-      sizeStat.textContent =
-        `${state.gridSize}×${state.gridSize}`;
+  sizeStat.textContent =
+    `${state.gridColumns}×${state.gridRows}`;
 
-      window.scrollTo({
-        top:
-          document.getElementById(
-            "puzzle"
-          ).offsetTop - 80,
-        behavior: "smooth"
+  window.scrollTo({
+    top:
+      document.getElementById(
+        "puzzle"
+      ).offsetTop - 80,
+    behavior: "smooth"
+  });
+}
+
+
+function getImageDimensions(src) {
+
+  return new Promise(resolve => {
+
+    const img =
+      new Image();
+
+    img.onload = () => {
+
+      resolve({
+        width: img.naturalWidth,
+        height: img.naturalHeight
       });
-    }
+
+    };
+
+    img.onerror = () => {
+
+      /*
+       * Safe fallback if dimensions cannot
+       * be determined.
+       */
+      resolve({
+        width: 1,
+        height: 1
+      });
+
+    };
+
+    img.src = src;
+  });
+}
 
 
     /*
@@ -1603,41 +1734,58 @@ if (confettiContainer) {
      */
 
     async function loadPuzzleImage(
-      src,
-      title = "Custom Picture"
-    ) {
+  src,
+  title = "Custom Picture"
+) {
 
-      const valid =
-        await validateImage(src);
+  const valid =
+    await validateImage(src);
 
-      if (!valid) {
+  if (!valid) {
 
-        console.warn(
-          "Default image could not be loaded."
-        );
+    console.warn(
+      "Default image could not be loaded."
+    );
 
-        state.imageSrc =
-          createFallbackImage();
+    state.imageSrc =
+      createFallbackImage();
 
-        state.imageTitle =
-          "Featured Picture";
+    state.imageTitle =
+      "Featured Picture";
 
-      } else {
+  } else {
 
-        state.imageSrc =
-          src;
+    state.imageSrc =
+      src;
 
-        state.imageTitle =
-          title;
-      }
+    state.imageTitle =
+      title;
+  }
 
-      puzzleTitle.textContent =
-        state.imageTitle;
+  /*
+   * Read the actual image dimensions.
+   */
+  const imageInfo =
+    await getImageDimensions(
+      state.imageSrc
+    );
 
-      createSolvedTiles();
+  /*
+   * Automatically choose a grid that
+   * matches the image proportions.
+   */
+  calculateGrid(
+    imageInfo.width,
+    imageInfo.height
+  );
 
-      shufflePuzzle();
-    }
+  puzzleTitle.textContent =
+    state.imageTitle;
+
+  createSolvedTiles();
+
+  shufflePuzzle();
+}
 
 
     /*
@@ -2091,8 +2239,7 @@ if (confettiContainer) {
           `url("${state.imageSrc}")`;
 
         board.style.backgroundSize =
-          "cover";
-
+  "100% 100%";
         board.style.backgroundPosition =
           "center";
 
@@ -2139,17 +2286,27 @@ if (confettiContainer) {
 
 
     difficulty.addEventListener(
-      "change",
-      () => {
+  "change",
+  async () => {
 
-        state.gridSize =
-          Number(
-            difficulty.value
-          );
+    state.gridSize =
+      Number(
+        difficulty.value
+      );
 
-        startNewPuzzle();
-      }
+    const imageInfo =
+      await getImageDimensions(
+        state.imageSrc
+      );
+
+    calculateGrid(
+      imageInfo.width,
+      imageInfo.height
     );
+
+    startNewPuzzle();
+  }
+);
 
 
     shuffleButton.addEventListener(
