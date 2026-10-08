@@ -1856,7 +1856,7 @@ const cleanTitle =
 
         saveToLibrary(
           imageSrc,
-          title
+          cleanTitle
         );
 
 
@@ -2501,10 +2501,6 @@ const cleanTitle =
 
     async function initialize() {
 
-  document.getElementById(
-    "currentYear"
-  ).textContent =
-    new Date().getFullYear();
 
 
   /*
