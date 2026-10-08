@@ -184,6 +184,45 @@
   z-index: 2;
 }
 
+/* =========================================================
+   VICTORY CONFETTI
+   ========================================================= */
+
+#confettiContainer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 8px;
+  height: 14px;
+  opacity: 0;
+  animation: confettiFall 3s ease-out forwards;
+}
+
+@keyframes confettiFall {
+
+  0% {
+    opacity: 1;
+    transform:
+      translate3d(0, -20px, 0)
+      rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(var(--drift), 105vh, 0)
+      rotate(var(--rotation));
+  }
+
+}
+
 #puzzleBoard.solved .puzzle-tile {
   cursor: default;
 }
@@ -264,6 +303,8 @@
 </head>
 
 <body class="text-zinc-100 font-sans">
+
+<div id="confettiContainer"></div>
 
   <!-- =========================================================
        NAVIGATION
@@ -434,7 +475,44 @@
         <div class="glass rounded-3xl p-3 shadow-2xl shadow-black/30 sm:p-5">
 
           <div class="relative mx-auto aspect-square w-full max-w-[760px]">
+<!-- Compact victory bar -->
+<div
+  id="victoryOverlay"
+  class="mb-3 hidden items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 shadow-lg animate-scale-in"
+>
 
+  <!-- Celebration icon -->
+  <div
+    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-lg"
+  >
+    🎉
+  </div>
+
+  <!-- Victory text -->
+  <div class="min-w-0 flex-1">
+
+    <div class="text-sm font-black text-white sm:text-base">
+      Puzzle Solved!
+    </div>
+
+    <p
+      id="victoryText"
+      class="text-xs text-zinc-400 sm:text-sm"
+    >
+      Great job!
+    </p>
+
+  </div>
+
+  <!-- Play again -->
+  <button
+    id="playAgainButton"
+    class="shrink-0 rounded-xl bg-white px-3 py-2 text-xs font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95 sm:px-4 sm:text-sm"
+  >
+    Play Again
+  </button>
+
+</div>
             <div
               id="puzzleBoard"
               class="grid h-full w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-inner"
@@ -444,39 +522,7 @@
 
           </div>
 
-          <!-- Victory message -->
-<div
-  id="victoryOverlay"
-  class="mt-5 hidden rounded-3xl border border-emerald-400/10 bg-zinc-900/80 p-6 text-center shadow-xl animate-scale-in"
->
 
-  <div class="victory-overlay">
-
-    <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 text-4xl">
-      🎉
-    </div>
-
-    <h3 class="text-3xl font-black">
-      Puzzle Solved!
-    </h3>
-
-    <p
-      id="victoryText"
-      class="mt-2 text-zinc-400"
-    >
-      Great job!
-    </p>
-
-    <button
-      id="playAgainButton"
-      class="mt-6 rounded-xl bg-white px-5 py-3 font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
-    >
-      Play Again
-    </button>
-
-  </div>
-
-</div>
 
           <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -875,6 +921,90 @@
       return `${minutes}:${seconds}`;
     }
 
+    /* =========================================================
+   VICTORY CONFETTI
+   ========================================================= */
+
+let confettiTimeout = null;
+
+function celebrateVictory() {
+
+  const container =
+    document.getElementById("confettiContainer");
+
+  if (!container) {
+    return;
+  }
+
+  // Clear any previous celebration.
+  container.innerHTML = "";
+
+  if (confettiTimeout) {
+    clearTimeout(confettiTimeout);
+  }
+
+  const colors = [
+    "#818cf8",
+    "#34d399",
+    "#fbbf24",
+    "#f472b6",
+    "#60a5fa",
+    "#a78bfa",
+    "#fb7185"
+  ];
+
+  const pieceCount = 90;
+
+  for (let i = 0; i < pieceCount; i++) {
+
+    const piece =
+      document.createElement("span");
+
+    piece.className =
+      "confetti-piece";
+
+    piece.style.left =
+      `${Math.random() * 100}%`;
+
+    piece.style.backgroundColor =
+      colors[
+        Math.floor(
+          Math.random() * colors.length
+        )
+      ];
+
+    piece.style.width =
+      `${6 + Math.random() * 6}px`;
+
+    piece.style.height =
+      `${8 + Math.random() * 10}px`;
+
+    piece.style.setProperty(
+      "--drift",
+      `${-120 + Math.random() * 240}px`
+    );
+
+    piece.style.setProperty(
+      "--rotation",
+      `${360 + Math.random() * 720}deg`
+    );
+
+    piece.style.animationDelay =
+      `${Math.random() * 0.35}s`;
+
+    piece.style.animationDuration =
+      `${2.5 + Math.random() * 0.8}s`;
+
+    container.appendChild(piece);
+  }
+
+  // Remove everything after the celebration.
+  confettiTimeout = setTimeout(() => {
+
+    container.innerHTML = "";
+
+  }, 3500);
+}
 
     function updateStats() {
 
@@ -1137,6 +1267,14 @@
   board.classList.remove("solved");
 
   victoryOverlay.classList.add("hidden");
+victoryOverlay.classList.remove("flex");
+
+const confettiContainer =
+  document.getElementById("confettiContainer");
+
+if (confettiContainer) {
+  confettiContainer.innerHTML = "";
+}
 
   state.solutionVisible = false;
 
@@ -1418,9 +1556,15 @@
     getElapsedSeconds();
 
   victoryText.textContent =
-    `Solved in ${state.moves} moves and ${formatTime(elapsed)}.`;
+    `Solved in ${state.moves} moves · ${formatTime(elapsed)}`;
 
+  // Show compact victory bar.
   victoryOverlay.classList.remove("hidden");
+
+  victoryOverlay.classList.add("flex");
+
+  // Celebrate!
+  celebrateVictory();
 }
 
 
