@@ -1840,10 +1840,16 @@ function getImageDimensions(src) {
         const imageSrc =
           event.target.result;
 
-        const title =
-          file.name
-            .replace(/\.[^/.]+$/, "")
-            .slice(0, 50);
+        const title = prompt(
+  "Give this image a name:"
+);
+
+if (title === null) {
+  return;
+}
+
+const cleanTitle =
+  title.trim().slice(0, 50) || "My Picture";
 
 
         /*
@@ -1862,7 +1868,7 @@ function getImageDimensions(src) {
 
         await loadPuzzleImage(
           imageSrc,
-          title
+          cleanTitle
         );
 
 
