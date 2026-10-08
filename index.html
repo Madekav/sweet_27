@@ -180,9 +180,17 @@
     }
 
     .puzzle-tile:hover {
-      filter: brightness(1.08);
-      z-index: 2;
-    }
+  filter: brightness(1.08);
+  z-index: 2;
+}
+
+#puzzleBoard.solved .puzzle-tile {
+  cursor: default;
+}
+
+#puzzleBoard.solved .puzzle-tile:hover {
+  filter: none;
+}
 
     .puzzle-tile:active {
       transform: scale(.97);
@@ -432,42 +440,43 @@
               class="grid h-full w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-inner"
             ></div>
 
-            <!-- Victory -->
-            <div
-              id="victoryOverlay"
-              class="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-2xl bg-zinc-950/75 p-6 backdrop-blur-md"
-            >
-
-              <div class="victory-overlay text-center">
-
-                <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 text-4xl">
-                  🎉
-                </div>
-
-                <h3 class="text-3xl font-black">
-                  Puzzle Solved!
-                </h3>
-
-                <p
-                  id="victoryText"
-                  class="mt-2 text-zinc-400"
-                >
-                  Great job!
-                </p>
-
-                <button
-                  id="playAgainButton"
-                  class="mt-6 rounded-xl bg-white px-5 py-3 font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
-                >
-                  Play Again
-                </button>
-
-              </div>
-
-            </div>
+            
 
           </div>
 
+          <!-- Victory message -->
+<div
+  id="victoryOverlay"
+  class="mt-5 hidden rounded-3xl border border-emerald-400/10 bg-zinc-900/80 p-6 text-center shadow-xl animate-scale-in"
+>
+
+  <div class="victory-overlay">
+
+    <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 text-4xl">
+      🎉
+    </div>
+
+    <h3 class="text-3xl font-black">
+      Puzzle Solved!
+    </h3>
+
+    <p
+      id="victoryText"
+      class="mt-2 text-zinc-400"
+    >
+      Great job!
+    </p>
+
+    <button
+      id="playAgainButton"
+      class="mt-6 rounded-xl bg-white px-5 py-3 font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
+    >
+      Play Again
+    </button>
+
+  </div>
+
+</div>
 
           <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -1099,55 +1108,45 @@
 
     function shufflePuzzle() {
 
-      let shuffled;
+  let shuffled;
 
-      /*
-       * Avoid accidentally starting with the solved board.
-       */
+  do {
 
-      do {
-
-        shuffled =
-          shuffleArray(
-            state.tiles
-          );
-
-      } while (
-        shuffled.every(
-          (value, index) =>
-            value === index
-        )
+    shuffled =
+      shuffleArray(
+        state.tiles
       );
 
-      state.tiles =
-        shuffled;
+  } while (
+    shuffled.every(
+      (value, index) =>
+        value === index
+    )
+  );
 
-      state.selectedTile =
-        null;
+  state.tiles = shuffled;
 
-      state.moves = 0;
+  state.selectedTile = null;
 
-      state.startTime = Date.now();
+  state.moves = 0;
 
-      state.solved = false;
+  state.startTime = Date.now();
 
-      state.solutionVisible = false;
+  state.solved = false;
 
-      victoryOverlay.classList.add(
-        "hidden"
-      );
+  board.classList.remove("solved");
 
-      victoryOverlay.classList.remove(
-        "flex"
-      );
+  victoryOverlay.classList.add("hidden");
 
-      showSolutionButton.textContent =
-        "Show original image";
+  state.solutionVisible = false;
 
-      renderBoard();
+  showSolutionButton.textContent =
+    "Show original image";
 
-      startTimer();
-    }
+  renderBoard();
+
+  startTimer();
+}
 
 
     /*
@@ -1399,34 +1398,30 @@
 
     function checkSolved() {
 
-      const solved =
-        state.tiles.every(
-          (tile, index) =>
-            tile === index
-        );
+  const solved =
+    state.tiles.every(
+      (tile, index) =>
+        tile === index
+    );
 
-      if (!solved) {
-        return;
-      }
+  if (!solved) {
+    return;
+  }
 
-      state.solved = true;
+  state.solved = true;
 
-      stopTimer();
+  board.classList.add("solved");
 
-      const elapsed =
-        getElapsedSeconds();
+  stopTimer();
 
-      victoryText.textContent =
-        `Solved in ${state.moves} moves and ${formatTime(elapsed)}.`;
+  const elapsed =
+    getElapsedSeconds();
 
-      victoryOverlay.classList.remove(
-        "hidden"
-      );
+  victoryText.textContent =
+    `Solved in ${state.moves} moves and ${formatTime(elapsed)}.`;
 
-      victoryOverlay.classList.add(
-        "flex"
-      );
-    }
+  victoryOverlay.classList.remove("hidden");
+}
 
 
     /*
