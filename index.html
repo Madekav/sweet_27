@@ -579,7 +579,7 @@
               </p>
 
               <p class="mt-1 text-xs text-zinc-500">
-                JPG, PNG, WEBP
+                JPG, PNG, WEBP · max 5 MB
               </p>
 
               <button
@@ -690,7 +690,7 @@
 
         <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">
           Upload your favorite pictures and they will appear here.
-          
+          They stay in your browser using LocalStorage.
         </p>
 
       </div>
@@ -814,12 +814,9 @@
 
 
     // ---------------------------------------------------------
-// 2. INDEXEDDB CONFIGURATION
-// ---------------------------------------------------------
-const DB_NAME = "picturePuzzleDB";
-const DB_VERSION = 1;
-const STORE_NAME = "library";
-const MAX_LIBRARY_ITEMS = 12;
+    // 2. LOCALSTORAGE KEY
+    // ---------------------------------------------------------
+    const STORAGE_KEY = "picturePuzzleLibrary";
 
 
     // ---------------------------------------------------------
@@ -829,7 +826,6 @@ const MAX_LIBRARY_ITEMS = 12;
     const state = {
   imageSrc: DEFAULT_IMAGE,
   imageTitle: "Featured Picture",
-  imageBlobUrl: null,
 
   gridSize: 4,
   gridColumns: 4,
@@ -1798,102 +1794,98 @@ function getImageDimensions(src) {
      * =========================================================
      */
 
-    async function handleImageFile(file) {
+    function handleImageFile(file) {
 
-  if (!file) {
-    return;
-  }
+      if (!file) {
+        return;
+      }
 
+      /*
+       * Security / UX limit.
+       */
 
-  /*
-   * Make sure the selected file is an image.
-   */
+      if (
+        !file.type.startsWith("image/")
+      ) {
 
-  if (!file.type.startsWith("image/")) {
+        showUploadMessage(
+          "Please choose a valid image file.",
+          "error"
+        );
 
-    showUploadMessage(
-      "Please choose a valid image file.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  /*
-   * Keep the original filename as the puzzle title.
-   */
-
-  const title =
-    file.name
-      .replace(/\.[^/.]+$/, "")
-      .slice(0, 50);
+        return;
+      }
 
 
-  try {
+      if (
+        file.size >
+        5 * 1024 * 1024
+      ) {
 
-    /*
-     * Save the ORIGINAL File object in IndexedDB.
-     *
-     * No Base64 conversion happens here.
-     */
+        showUploadMessage(
+          "Please choose an image smaller than 5 MB.",
+          "error"
+        );
 
-    await saveToLibrary(
-      file,
-      title
-    );
+        return;
+      }
 
 
-    /*
-     * Create a temporary browser URL
-     * for displaying the original image.
-     */
+      const reader =
+        new FileReader();
 
-    if (state.imageBlobUrl) {
 
-      URL.revokeObjectURL(
-        state.imageBlobUrl
-      );
+      reader.onload = async event => {
+
+        const imageSrc =
+          event.target.result;
+
+        const title =
+          file.name
+            .replace(/\.[^/.]+$/, "")
+            .slice(0, 50);
+
+
+        /*
+         * Save the image in the browser.
+         */
+
+        saveToLibrary(
+          imageSrc,
+          title
+        );
+
+
+        /*
+         * Immediately make it playable.
+         */
+
+        await loadPuzzleImage(
+          imageSrc,
+          title
+        );
+
+
+        showUploadMessage(
+          "Image added to your puzzle library!",
+          "success"
+        );
+
+        renderLibrary();
+      };
+
+
+      reader.onerror = () => {
+
+        showUploadMessage(
+          "Unable to read this image.",
+          "error"
+        );
+      };
+
+
+      reader.readAsDataURL(file);
     }
-
-
-    state.imageBlobUrl =
-      URL.createObjectURL(file);
-
-
-    /*
-     * Immediately load the image into
-     * the puzzle.
-     */
-
-    await loadPuzzleImage(
-      state.imageBlobUrl,
-      title
-    );
-
-
-    showUploadMessage(
-      "Image added to your puzzle library!",
-      "success"
-    );
-
-
-    await renderLibrary();
-
-  } catch (error) {
-
-    console.error(
-      "Could not save image to the puzzle library.",
-      error
-    );
-
-
-    showUploadMessage(
-      "Unable to save this image in your browser.",
-      "error"
-    );
-  }
-}
 
 
     function showUploadMessage(
@@ -1940,548 +1932,187 @@ function getImageDimensions(src) {
 
 
     /*
- * =========================================================
- * INDEXEDDB LIBRARY
- * =========================================================
- */
+     * =========================================================
+     * LOCALSTORAGE LIBRARY
+     * =========================================================
+     */
 
+    function getLibrary() {
 
-/*
- * Open the browser's IndexedDB database.
- */
+      try {
 
-function openLibraryDB() {
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const request =
-        indexedDB.open(
-          DB_NAME,
-          DB_VERSION
+        return JSON.parse(
+          localStorage.getItem(
+            STORAGE_KEY
+          ) || "[]"
         );
 
+      } catch (error) {
 
-      request.onupgradeneeded =
-        event => {
-
-          const db =
-            event.target.result;
-
-
-          if (
-            !db.objectStoreNames.contains(
-              STORE_NAME
-            )
-          ) {
-
-            db.createObjectStore(
-              STORE_NAME,
-              {
-                keyPath: "id"
-              }
-            );
-          }
-        };
-
-
-      request.onsuccess = () => {
-
-        resolve(
-          request.result
-        );
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
-        );
-      };
-    }
-  );
-}
-
-
-/*
- * Get every picture from the library.
- */
-
-async function getLibrary() {
-
-  const db =
-    await openLibraryDB();
-
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readonly"
+        console.error(
+          "Could not read puzzle library.",
+          error
         );
 
-
-      const request =
-        transaction
-          .objectStore(STORE_NAME)
-          .getAll();
-
-
-      request.onsuccess = () => {
-
-        const library =
-          request.result.sort(
-            (a, b) =>
-              new Date(b.createdAt) -
-              new Date(a.createdAt)
-          );
-
-
-        resolve(
-          library
-        );
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
-        );
-      };
-    }
-  );
-}
-
-
-/*
- * Get one specific picture.
- */
-
-async function getLibraryItem(id) {
-
-  const db =
-    await openLibraryDB();
-
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readonly"
-        );
-
-
-      const request =
-        transaction
-          .objectStore(STORE_NAME)
-          .get(id);
-
-
-      request.onsuccess = () => {
-
-        resolve(
-          request.result || null
-        );
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
-        );
-      };
-    }
-  );
-}
-
-
-/*
- * Save one item in IndexedDB.
- */
-
-async function putLibraryItem(item) {
-
-  const db =
-    await openLibraryDB();
-
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readwrite"
-        );
-
-
-      const request =
-        transaction
-          .objectStore(STORE_NAME)
-          .put(item);
-
-
-      request.onsuccess = () => {
-
-        resolve();
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
-        );
-      };
-    }
-  );
-}
-
-
-/*
- * Save an uploaded image.
- *
- * IMPORTANT:
- * The original File object is stored directly.
- * No Base64 conversion is performed.
- */
-
-async function saveToLibrary(
-  image,
-  title
-) {
-
-  const library =
-    await getLibrary();
-
-
-  /*
-   * Avoid saving the exact same file twice.
-   */
-
-  const duplicate =
-    library.some(
-      item => {
-
-        if (!item.image) {
-          return false;
-        }
-
-
-        return (
-          item.image.size ===
-            image.size &&
-
-          item.image.type ===
-            image.type &&
-
-          item.image.name ===
-            image.name &&
-
-          item.image.lastModified ===
-            image.lastModified
-        );
+        return [];
       }
-    );
+    }
 
 
-  if (duplicate) {
+    function saveToLibrary(
+      image,
+      title
+    ) {
 
-    return;
-  }
-
-
-  const item = {
-
-    id:
-      Date.now().toString() +
-      Math.random()
-        .toString(36)
-        .slice(2),
-
-    title:
-      title || "My Picture",
-
-    image,
-
-    createdAt:
-      new Date().toISOString()
-  };
+      const library =
+        getLibrary();
 
 
-  /*
-   * Keep the library at a maximum
-   * of MAX_LIBRARY_ITEMS pictures.
-   *
-   * The oldest picture is removed
-   * when the limit is reached.
-   */
+      /*
+       * Avoid saving exact duplicate images.
+       */
 
-  const oldest =
-    library.length >=
-    MAX_LIBRARY_ITEMS
-      ? library[library.length - 1]
-      : null;
-
-
-  const db =
-    await openLibraryDB();
-
-
-  await new Promise(
-    (resolve, reject) => {
-
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readwrite"
+      const duplicate =
+        library.some(
+          item =>
+            item.image === image
         );
 
 
-      const store =
-        transaction.objectStore(
-          STORE_NAME
-        );
-
-
-      if (oldest) {
-
-        store.delete(
-          oldest.id
-        );
+      if (duplicate) {
+        return;
       }
 
 
-      store.put(
-        item
+      const item = {
+        id:
+          Date.now().toString() +
+          Math.random()
+            .toString(36)
+            .slice(2),
+
+        title:
+          title || "My Picture",
+
+        image,
+
+        createdAt:
+          new Date().toISOString()
+      };
+
+
+      library.unshift(item);
+
+
+      /*
+       * Keep the library reasonably small.
+       *
+       * LocalStorage is usually limited to around 5 MB,
+       * although exact limits vary by browser.
+       */
+
+      const limitedLibrary =
+        library.slice(0, 12);
+
+
+      try {
+
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(
+            limitedLibrary
+          )
+        );
+
+      } catch (error) {
+
+        console.warn(
+          "LocalStorage limit reached.",
+          error
+        );
+
+        showUploadMessage(
+          "The browser library is full. Delete an old image and try again.",
+          "error"
+        );
+      }
+    }
+
+
+    function deleteFromLibrary(id) {
+
+      const library =
+        getLibrary();
+
+      const updated =
+        library.filter(
+          item =>
+            item.id !== id
+        );
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(updated)
       );
 
-
-      transaction.oncomplete =
-        () => {
-
-          resolve();
-        };
-
-
-      transaction.onerror =
-        () => {
-
-          reject(
-            transaction.error
-          );
-        };
-
-
-      transaction.onabort =
-        () => {
-
-          reject(
-            transaction.error ||
-            new Error(
-              "IndexedDB transaction aborted."
-            )
-          );
-        };
+      renderLibrary();
     }
-  );
-}
 
 
-/*
- * Delete one picture from IndexedDB.
- */
+    function renderLibrary() {
 
-async function deleteFromLibrary(
-  id
-) {
-
-  const db =
-    await openLibraryDB();
+      const library =
+        getLibrary();
 
 
-  await new Promise(
-    (resolve, reject) => {
+      libraryGrid.innerHTML = "";
 
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readwrite"
+
+      if (!library.length) {
+
+        emptyLibrary.classList.remove(
+          "hidden"
         );
 
-
-      const request =
-        transaction
-          .objectStore(STORE_NAME)
-          .delete(id);
-
-
-      request.onsuccess = () => {
-
-        resolve();
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
-        );
-      };
-    }
-  );
-
-
-  await renderLibrary();
-}
-
-
-/*
- * Delete every picture from IndexedDB.
- */
-
-async function clearLibrary() {
-
-  const db =
-    await openLibraryDB();
-
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const transaction =
-        db.transaction(
-          STORE_NAME,
-          "readwrite"
+        libraryGrid.classList.add(
+          "hidden"
         );
 
-
-      const request =
-        transaction
-          .objectStore(STORE_NAME)
-          .clear();
-
-
-      request.onsuccess = () => {
-
-        resolve();
-      };
-
-
-      request.onerror = () => {
-
-        reject(
-          request.error
+        clearLibraryButton.classList.add(
+          "hidden"
         );
-      };
-    }
-  );
-}
+
+        return;
+      }
 
 
-/*
- * Load an image from the IndexedDB library
- * into the puzzle.
- */
-
-async function loadLibraryItem(
-  id
-) {
-
-  const item =
-    await getLibraryItem(id);
-
-
-  if (!item) {
-    return;
-  }
-
-
-  /*
-   * Release the previous temporary URL.
-   */
-
-  if (state.imageBlobUrl) {
-
-    URL.revokeObjectURL(
-      state.imageBlobUrl
-    );
-  }
-
-
-  /*
-   * Create a temporary URL directly
-   * from the original stored image.
-   */
-
-  state.imageBlobUrl =
-    URL.createObjectURL(
-      item.image
-    );
-
-
-  await loadPuzzleImage(
-    state.imageBlobUrl,
-    item.title
-  );
-}
-
-
-/*
- * Render the library.
- */
-
-async function renderLibrary() {
-
-  try {
-
-    const library =
-      await getLibrary();
-
-
-    libraryGrid.innerHTML =
-      "";
-
-
-    if (!library.length) {
-
-      emptyLibrary.classList.remove(
+      emptyLibrary.classList.add(
         "hidden"
       );
 
-      return;
-    }
+      libraryGrid.classList.remove(
+        "hidden"
+      );
+
+      clearLibraryButton.classList.remove(
+        "hidden"
+      );
 
 
-    emptyLibrary.classList.add(
-      "hidden"
-    );
-
-
-    library.forEach(
-      item => {
+      library.forEach(item => {
 
         const card =
-          document.createElement(
-            "article"
-          );
-
+          document.createElement("article");
 
         card.className =
-          "overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm";
+          "glass group overflow-hidden rounded-2xl animate-fade-in";
 
 
         card.innerHTML = `
           <div class="relative">
 
             <img
+              src="${item.image}"
               alt="${escapeHtml(item.title)}"
               class="library-image w-full"
             >
@@ -2489,179 +2120,88 @@ async function renderLibrary() {
             <button
               type="button"
               data-delete="${item.id}"
-              class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-lg text-white transition hover:bg-black/80"
-              aria-label="Delete image"
+              aria-label="Delete ${escapeHtml(item.title)}"
+              class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm backdrop-blur transition hover:bg-red-500"
             >
               ×
             </button>
 
           </div>
 
-          <div class="p-3">
+          <div class="p-4">
 
-            <p
-              class="truncate text-sm font-semibold text-zinc-800"
-              title="${escapeHtml(item.title)}"
-            >
+            <h3 class="truncate font-semibold">
               ${escapeHtml(item.title)}
-            </p>
+            </h3>
 
-            <button
-              type="button"
-              data-play="${item.id}"
-              class="mt-3 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
-            >
-              Play
-            </button>
+            <div class="mt-3 flex gap-2">
+
+              <button
+                type="button"
+                data-play="${item.id}"
+                class="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
+              >
+                Play
+              </button>
+
+            </div>
 
           </div>
         `;
 
 
         /*
-         * Create a temporary URL for the
-         * library thumbnail.
+         * Delete button
          */
 
-        const imageElement =
-          card.querySelector(
-            "img"
-          );
-
-
-        const imageUrl =
-          URL.createObjectURL(
-            item.image
-          );
-
-
-        imageElement.src =
-          imageUrl;
-
-
-        /*
-         * Release the thumbnail URL once
-         * the browser has loaded the image.
-         */
-
-        const releaseImageUrl =
-          () => {
-
-            URL.revokeObjectURL(
-              imageUrl
-            );
-          };
-
-
-        imageElement.addEventListener(
-          "load",
-          releaseImageUrl,
-          {
-            once: true
-          }
-        );
-
-
-        imageElement.addEventListener(
-          "error",
-          releaseImageUrl,
-          {
-            once: true
-          }
-        );
-
-
-        /*
-         * Delete button.
-         */
-
-        const deleteButton =
-          card.querySelector(
+        card
+          .querySelector(
             "[data-delete]"
-          );
+          )
+          .addEventListener(
+            "click",
+            () => {
 
-
-        deleteButton.addEventListener(
-          "click",
-          async () => {
-
-            try {
-
-              await deleteFromLibrary(
+              deleteFromLibrary(
                 item.id
               );
-
-            } catch (error) {
-
-              console.error(
-                "Could not delete library image.",
-                error
-              );
-
-              showUploadMessage(
-                "Unable to delete this image.",
-                "error"
-              );
             }
-          }
-        );
+          );
 
 
         /*
-         * Play button.
+         * Play button
          */
 
-        const playButton =
-          card.querySelector(
+        card
+          .querySelector(
             "[data-play]"
-          );
+          )
+          .addEventListener(
+            "click",
+            async () => {
 
-
-        playButton.addEventListener(
-          "click",
-          async () => {
-
-            try {
-
-              await loadLibraryItem(
-                item.id
+              await loadPuzzleImage(
+                item.image,
+                item.title
               );
 
-            } catch (error) {
-
-              console.error(
-                "Could not load library image.",
-                error
-              );
-
-              showUploadMessage(
-                "Unable to open this image.",
-                "error"
-              );
+              document
+                .getElementById(
+                  "puzzle"
+                )
+                .scrollIntoView({
+                  behavior: "smooth"
+                });
             }
-          }
-        );
+          );
 
 
         libraryGrid.appendChild(
           card
         );
-      }
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Could not load puzzle library.",
-      error
-    );
-
-    showUploadMessage(
-      "Unable to load your image library.",
-      "error"
-    );
-  }
-}
+      });
+    }
 
 
     /*
@@ -2928,40 +2468,25 @@ async function renderLibrary() {
      */
 
     clearLibraryButton.addEventListener(
-  "click",
-  async () => {
+      "click",
+      () => {
 
-    const confirmed =
-      confirm(
-        "Are you sure you want to delete all saved pictures?"
-      );
+        const confirmed =
+          confirm(
+            "Delete all saved puzzle images from this browser?"
+          );
 
+        if (!confirmed) {
+          return;
+        }
 
-    if (!confirmed) {
-      return;
-    }
+        localStorage.removeItem(
+          STORAGE_KEY
+        );
 
-
-    try {
-
-      await clearLibrary();
-
-      await renderLibrary();
-
-    } catch (error) {
-
-      console.error(
-        "Could not clear puzzle library.",
-        error
-      );
-
-      showUploadMessage(
-        "Unable to clear your image library.",
-        "error"
-      );
-    }
-  }
-);
+        renderLibrary();
+      }
+    );
 
 
     /*
@@ -2972,26 +2497,28 @@ async function renderLibrary() {
 
     async function initialize() {
 
-  currentYear.textContent =
-    new Date().getFullYear();
+      document.getElementById(
+        "currentYear"
+      ).textContent =
+        new Date().getFullYear();
 
 
-  /*
-   * Load the IndexedDB library first.
-   */
+      /*
+       * Render previously saved images.
+       */
 
-  await renderLibrary();
+      renderLibrary();
 
 
-  /*
-   * Then load the default puzzle image.
-   */
+      /*
+       * Load default repository image.
+       */
 
-  await loadPuzzleImage(
-    DEFAULT_IMAGE,
-    "Featured Picture"
-  );
-}
+      await loadPuzzleImage(
+        DEFAULT_IMAGE,
+        "Featured Picture"
+      );
+    }
 
 
     initialize();
