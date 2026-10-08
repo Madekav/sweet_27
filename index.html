@@ -2497,28 +2497,55 @@ function getImageDimensions(src) {
 
     async function initialize() {
 
-      document.getElementById(
-        "currentYear"
-      ).textContent =
-        new Date().getFullYear();
+  document.getElementById(
+    "currentYear"
+  ).textContent =
+    new Date().getFullYear();
 
 
-      /*
-       * Render previously saved images.
-       */
+  /*
+   * Make sure the default GitHub image
+   * is also available in the library.
+   */
 
-      renderLibrary();
+  const library = getLibrary();
+
+  const defaultImageExists =
+    library.some(
+      item => item.image === DEFAULT_IMAGE
+    );
+
+  if (!defaultImageExists) {
+    library.push({
+      id: "default-repository-image",
+      title: "Featured Picture",
+      image: DEFAULT_IMAGE,
+      createdAt: new Date().toISOString()
+    });
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(library)
+    );
+  }
 
 
-      /*
-       * Load default repository image.
-       */
+  /*
+   * Render previously saved images.
+   */
 
-      await loadPuzzleImage(
-        DEFAULT_IMAGE,
-        "Featured Picture"
-      );
-    }
+  renderLibrary();
+
+
+  /*
+   * Load default repository image.
+   */
+
+  await loadPuzzleImage(
+    DEFAULT_IMAGE,
+    "Featured Picture"
+  );
+}
 
 
     initialize();
