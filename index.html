@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- =========================================================
+       GitHub Pages Image Puzzle
+       ---------------------------------------------------------
+       Everything is contained in this one file.
+
+       Repository structure:
+
+       your-repository/
+       ├── index.html
+       └── assets/
+           └── puzzle.jpg
+
+       Change DEFAULT_IMAGE below in the JavaScript section
+       to match your default repository image.
+       ========================================================= -->
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="description"
+    content="A beautiful interactive picture puzzle with custom image uploads, browser image library and Spotify music."
+  />
+
+  <title>Picture Puzzle</title>
+
+  <!-- Tailwind CSS CDN.
+       This works on GitHub Pages because Tailwind is loaded client-side. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: [
+              "Inter",
+              "ui-sans-serif",
+              "system-ui",
+              "sans-serif"
+            ]
+          },
+          animation: {
+            "fade-in": "fadeIn .35s ease-out",
+            "scale-in": "scaleIn .3s ease-out",
+            "float": "float 4s ease-in-out infinite"
+          },
+          keyframes: {
+            fadeIn: {
+              "0%": {
+                opacity: "0",
+                transform: "translateY(8px)"
+              },
+              "100%": {
+                opacity: "1",
+                transform: "translateY(0)"
+              }
+            },
+            scaleIn: {
+              "0%": {
+                opacity: "0",
+                transform: "scale(.92)"
+              },
+              "100%": {
+                opacity: "1",
+                transform: "scale(1)"
+              }
+            },
+            float: {
+              "0%, 100%": {
+                transform: "translateY(0)"
+              },
+              "50%": {
+                transform: "translateY(-6px)"
+              }
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /*
+      Additional CSS that complements Tailwind.
+    */
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(
+          circle at top left,
+          rgba(99, 102, 241, .12),
+          transparent 30%
+        ),
+        radial-gradient(
+          circle at bottom right,
+          rgba(168, 85, 247, .10),
+          transparent 30%
+        ),
+        #09090b;
+    }
+
+    /* Glass effect */
+    .glass {
+      background: rgba(24, 24, 27, .72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    /* Puzzle board */
+    #puzzleBoard {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .puzzle-tile {
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      background-repeat: no-repeat;
+      transition:
+        transform .18s ease,
+        filter .18s ease,
+        box-shadow .18s ease;
+    }
+
+    .puzzle-tile:hover {
+      filter: brightness(1.08);
+      z-index: 2;
+    }
+
+    .puzzle-tile:active {
+      transform: scale(.97);
+    }
+
+    .puzzle-tile.selected {
+      z-index: 5;
+      box-shadow:
+        inset 0 0 0 3px rgba(129, 140, 248, .95),
+        0 0 24px rgba(99, 102, 241, .45);
+      transform: scale(.97);
+    }
+
+    .puzzle-tile.dragging {
+      opacity: .45;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed rgba(255, 255, 255, .16);
+      transition:
+        border-color .2s ease,
+        background .2s ease,
+        transform .2s ease;
+    }
+
+    .upload-zone.drag-over {
+      border-color: rgb(129, 140, 248);
+      background: rgba(99, 102, 241, .10);
+      transform: scale(1.01);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #09090b;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+
+    /* Victory overlay */
+    .victory-overlay {
+      animation: scaleIn .35s ease-out;
+    }
+
+    /* Library image */
+    .library-image {
+      aspect-ratio: 16 / 10;
+      object-fit: cover;
+    }
+
+    /* Prevent huge Spotify iframe on mobile */
+    .spotify-frame {
+      width: 100%;
+      min-height: 152px;
+      border: 0;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+
+<body class="text-zinc-100 font-sans">
+
+  <!-- =========================================================
+       NAVIGATION
+       ========================================================= -->
+  <header class="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+
+      <a
+        href="#top"
+        class="flex items-center gap-3"
+        aria-label="Picture Puzzle home"
+      >
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-xl">
+          🧩
+        </div>
+
+        <div>
+          <div class="font-bold tracking-tight">
+            Picture Puzzle
+          </div>
+
+          <div class="hidden text-xs text-zinc-500 sm:block">
+            Play • Upload • Listen
+          </div>
+        </div>
+      </a>
+
+      <nav class="hidden items-center gap-6 text-sm text-zinc-400 md:flex">
+        <a href="#puzzle" class="transition hover:text-white">
+          Puzzle
+        </a>
+
+        <a href="#library" class="transition hover:text-white">
+          My Library
+        </a>
+
+        <a href="#music" class="transition hover:text-white">
+          Music
+        </a>
+      </nav>
+
+      <button
+        id="newPuzzleNavButton"
+        class="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
+      >
+        New Puzzle
+      </button>
+
+    </div>
+  </header>
+
+
+  <main id="top" class="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+
+    <!-- =======================================================
+         HERO
+         ======================================================= -->
+    <section class="mb-10 grid items-center gap-8 lg:grid-cols-[1.15fr_.85fr]">
+
+      <div class="animate-fade-in">
+
+        <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 text-xs font-medium text-indigo-300">
+          <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400"></span>
+          Your browser. Your puzzles.
+        </div>
+
+        <h1 class="max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+          Turn your favorite
+          <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            pictures
+          </span>
+          into puzzles.
+        </h1>
+
+        <p class="mt-5 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
+          Solve the featured picture, upload your own images, save favorites
+          directly in your browser, and enjoy music while you play.
+        </p>
+
+      </div>
+
+      <!-- Quick stats -->
+      <div class="glass rounded-3xl p-5 shadow-2xl shadow-black/20">
+
+        <div class="grid grid-cols-3 gap-3">
+
+          <div class="rounded-2xl bg-white/[.04] p-4 text-center">
+            <div class="text-2xl font-bold text-white" id="movesStat">
+              0
+            </div>
+            <div class="mt-1 text-xs text-zinc-500">
+              Moves
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-white/[.04] p-4 text-center">
+            <div class="text-2xl font-bold text-white" id="timeStat">
+              00:00
+            </div>
+            <div class="mt-1 text-xs text-zinc-500">
+              Time
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-white/[.04] p-4 text-center">
+            <div class="text-2xl font-bold text-white" id="sizeStat">
+              4×4
+            </div>
+            <div class="mt-1 text-xs text-zinc-500">
+              Grid
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         PUZZLE SECTION
+         ======================================================= -->
+    <section id="puzzle" class="scroll-mt-24">
+
+      <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+
+        <div>
+          <div class="mb-1 text-sm font-medium text-indigo-400">
+            CURRENT PUZZLE
+          </div>
+
+          <h2
+            id="puzzleTitle"
+            class="text-2xl font-bold tracking-tight sm:text-3xl"
+          >
+            Featured Picture
+          </h2>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+
+          <select
+            id="difficulty"
+            class="rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none transition focus:border-indigo-400"
+            aria-label="Puzzle difficulty"
+          >
+            <option value="3">Easy · 3×3</option>
+            <option value="4" selected>Medium · 4×4</option>
+            <option value="5">Hard · 5×5</option>
+          </select>
+
+          <button
+            id="shuffleButton"
+            class="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold transition hover:bg-white/10 active:scale-95"
+          >
+            🔀 Shuffle
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
+
+        <!-- Puzzle -->
+        <div class="glass rounded-3xl p-3 shadow-2xl shadow-black/30 sm:p-5">
+
+          <div class="relative mx-auto aspect-square w-full max-w-[760px]">
+
+            <div
+              id="puzzleBoard"
+              class="grid h-full w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-inner"
+            ></div>
+
+            <!-- Victory -->
+            <div
+              id="victoryOverlay"
+              class="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-2xl bg-zinc-950/75 p-6 backdrop-blur-md"
+            >
+
+              <div class="victory-overlay text-center">
+
+                <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 text-4xl">
+                  🎉
+                </div>
+
+                <h3 class="text-3xl font-black">
+                  Puzzle Solved!
+                </h3>
+
+                <p
+                  id="victoryText"
+                  class="mt-2 text-zinc-400"
+                >
+                  Great job!
+                </p>
+
+                <button
+                  id="playAgainButton"
+                  class="mt-6 rounded-xl bg-white px-5 py-3 font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
+                >
+                  Play Again
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+            <p class="text-sm text-zinc-500">
+              <span class="hidden sm:inline">Click two tiles to swap them.</span>
+              <span class="sm:hidden">Tap two tiles to swap them.</span>
+            </p>
+
+            <button
+              id="showSolutionButton"
+              class="text-sm font-semibold text-indigo-400 transition hover:text-indigo-300"
+            >
+              Show original image
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- Upload panel -->
+        <aside class="space-y-4">
+
+          <div class="glass rounded-3xl p-5">
+
+            <div class="mb-4">
+              <h3 class="font-bold">
+                Create a puzzle
+              </h3>
+
+              <p class="mt-1 text-sm leading-6 text-zinc-500">
+                Drop an image here or choose one from your device.
+              </p>
+            </div>
+
+
+            <div
+              id="uploadZone"
+              class="upload-zone cursor-pointer rounded-2xl p-6 text-center"
+            >
+
+              <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-2xl">
+                📸
+              </div>
+
+              <p class="font-semibold">
+                Drop your image
+              </p>
+
+              <p class="mt-1 text-xs text-zinc-500">
+                JPG, PNG, WEBP · max 5 MB
+              </p>
+
+              <button
+                id="chooseImageButton"
+                class="mt-4 rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-400 active:scale-95"
+              >
+                Choose Image
+              </button>
+
+              <input
+                id="imageInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                class="hidden"
+              />
+
+            </div>
+
+            <div
+              id="uploadMessage"
+              class="mt-3 hidden rounded-xl px-3 py-2 text-xs"
+            ></div>
+
+          </div>
+
+
+          <!-- Instructions -->
+          <div class="glass rounded-3xl p-5">
+
+            <h3 class="font-bold">
+              How to play
+            </h3>
+
+            <div class="mt-4 space-y-3 text-sm text-zinc-400">
+
+              <div class="flex gap-3">
+                <span>①</span>
+                <span>Select two tiles to swap them.</span>
+              </div>
+
+              <div class="flex gap-3">
+                <span>②</span>
+                <span>Reconstruct the original picture.</span>
+              </div>
+
+              <div class="flex gap-3">
+                <span>③</span>
+                <span>Finish with the fewest moves possible.</span>
+              </div>
+
+            </div>
+
+          </div>
+
+        </aside>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         LIBRARY
+         ======================================================= -->
+    <section
+      id="library"
+      class="scroll-mt-24 mt-16"
+    >
+
+      <div class="mb-5 flex items-end justify-between">
+
+        <div>
+          <div class="mb-1 text-sm font-medium text-indigo-400">
+            YOUR COLLECTION
+          </div>
+
+          <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">
+            My Puzzle Library
+          </h2>
+
+          <p class="mt-2 text-sm text-zinc-500">
+            Your uploaded images are stored locally in this browser.
+          </p>
+        </div>
+
+        <button
+          id="clearLibraryButton"
+          class="hidden text-sm font-medium text-red-400 transition hover:text-red-300"
+        >
+          Clear library
+        </button>
+
+      </div>
+
+
+      <div
+        id="emptyLibrary"
+        class="glass rounded-3xl p-10 text-center"
+      >
+
+        <div class="mx-auto mb-4 text-4xl">
+          🖼️
+        </div>
+
+        <h3 class="font-bold">
+          Your library is empty
+        </h3>
+
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">
+          Upload your favorite pictures and they will appear here.
+          They stay in your browser using LocalStorage.
+        </p>
+
+      </div>
+
+
+      <div
+        id="libraryGrid"
+        class="hidden grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      ></div>
+
+    </section>
+
+
+    <!-- =======================================================
+         MUSIC
+         ======================================================= -->
+    <section
+      id="music"
+      class="scroll-mt-24 mt-16"
+    >
+
+      <div class="glass overflow-hidden rounded-3xl">
+
+        <div class="grid lg:grid-cols-[.75fr_1.25fr]">
+
+          <div class="flex flex-col justify-center p-6 sm:p-8">
+
+            <div class="mb-3 inline-flex w-fit rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
+              MUSIC WHILE YOU PLAY
+            </div>
+
+            <h2 class="text-3xl font-black">
+              Set the mood.
+            </h2>
+
+            <p class="mt-3 max-w-lg text-sm leading-6 text-zinc-500">
+              Keep the puzzle going while your favorite Spotify playlist
+              plays in the background.
+            </p>
+
+            <div class="mt-6 flex items-center gap-3 text-sm text-zinc-400">
+              <span class="text-xl">🎧</span>
+              Spotify player
+            </div>
+
+          </div>
+
+
+          <div class="p-4 sm:p-6">
+
+            <!--
+              Replace the Spotify playlist URL below.
+
+              Example:
+              https://open.spotify.com/embed/playlist/YOUR_PLAYLIST_ID
+
+              IMPORTANT:
+              Spotify embeds may require users to interact with the
+              player before audio starts because of browser autoplay rules.
+            -->
+
+            <iframe
+              class="spotify-frame"
+              src="https://open.spotify.com/embed/playlist/37i9dQZF1DX4WYpdgoIcn6?utm_source=generator"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              title="Spotify playlist"
+            ></iframe>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         FOOTER
+         ======================================================= -->
+    <footer class="border-t border-white/5 py-10">
+
+      <div class="flex flex-col gap-4 text-sm text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+
+        <p>
+          © <span id="currentYear"></span> Picture Puzzle
+        </p>
+
+        <p>
+          Runs entirely in your browser.
+        </p>
+
+      </div>
+
+    </footer>
+
+  </main>
+
+
+  <!-- =========================================================
+       JAVASCRIPT
+       ========================================================= -->
+  <script>
+    /*
+     * =========================================================
+     * CONFIGURATION
+     * =========================================================
+     */
+
+    // ---------------------------------------------------------
+    // 1. DEFAULT IMAGE
+    // ---------------------------------------------------------
+    //
+    // Put an image in your repository, for example:
+    //
+    // /assets/puzzle.jpg
+    //
+    // Then change this value:
+    //
+    const DEFAULT_IMAGE = "assets/puzzle.jpg";
+
+    //
+    // If the image cannot be loaded, the application will
+    // automatically display a generated fallback image.
+    //
+
+
+    // ---------------------------------------------------------
+    // 2. LOCALSTORAGE KEY
+    // ---------------------------------------------------------
+    const STORAGE_KEY = "picturePuzzleLibrary";
+
+
+    // ---------------------------------------------------------
+    // 3. APPLICATION STATE
+    // ---------------------------------------------------------
+
+    const state = {
+      imageSrc: DEFAULT_IMAGE,
+      imageTitle: "Featured Picture",
+
+      gridSize: 4,
+
+      tiles: [],
+      selectedTile: null,
+
+      moves: 0,
+
+      startTime: null,
+      timerInterval: null,
+
+      solved: false,
+
+      solutionVisible: false
+    };
+
+
+    /*
+     * =========================================================
+     * DOM REFERENCES
+     * =========================================================
+     */
+
+    const board = document.getElementById("puzzleBoard");
+
+    const difficulty =
+      document.getElementById("difficulty");
+
+    const shuffleButton =
+      document.getElementById("shuffleButton");
+
+    const puzzleTitle =
+      document.getElementById("puzzleTitle");
+
+    const movesStat =
+      document.getElementById("movesStat");
+
+    const timeStat =
+      document.getElementById("timeStat");
+
+    const sizeStat =
+      document.getElementById("sizeStat");
+
+    const victoryOverlay =
+      document.getElementById("victoryOverlay");
+
+    const victoryText =
+      document.getElementById("victoryText");
+
+    const playAgainButton =
+      document.getElementById("playAgainButton");
+
+    const uploadZone =
+      document.getElementById("uploadZone");
+
+    const imageInput =
+      document.getElementById("imageInput");
+
+    const chooseImageButton =
+      document.getElementById("chooseImageButton");
+
+    const uploadMessage =
+      document.getElementById("uploadMessage");
+
+    const libraryGrid =
+      document.getElementById("libraryGrid");
+
+    const emptyLibrary =
+      document.getElementById("emptyLibrary");
+
+    const clearLibraryButton =
+      document.getElementById("clearLibraryButton");
+
+    const showSolutionButton =
+      document.getElementById("showSolutionButton");
+
+    const newPuzzleNavButton =
+      document.getElementById("newPuzzleNavButton");
+
+
+    /*
+     * =========================================================
+     * UTILITY FUNCTIONS
+     * =========================================================
+     */
+
+    function formatTime(totalSeconds) {
+
+      const minutes =
+        Math.floor(totalSeconds / 60)
+          .toString()
+          .padStart(2, "0");
+
+      const seconds =
+        (totalSeconds % 60)
+          .toString()
+          .padStart(2, "0");
+
+      return `${minutes}:${seconds}`;
+    }
+
+
+    function updateStats() {
+
+      movesStat.textContent = state.moves;
+
+      sizeStat.textContent =
+        `${state.gridSize}×${state.gridSize}`;
+
+      if (state.startTime) {
+
+        const elapsed =
+          Math.floor(
+            (Date.now() - state.startTime) / 1000
+          );
+
+        timeStat.textContent =
+          formatTime(elapsed);
+      }
+    }
+
+
+    function startTimer() {
+
+      stopTimer();
+
+      if (!state.startTime) {
+        state.startTime = Date.now();
+      }
+
+      state.timerInterval =
+        setInterval(updateStats, 1000);
+
+      updateStats();
+    }
+
+
+    function stopTimer() {
+
+      if (state.timerInterval) {
+
+        clearInterval(
+          state.timerInterval
+        );
+
+        state.timerInterval = null;
+      }
+    }
+
+
+    function getElapsedSeconds() {
+
+      if (!state.startTime) {
+        return 0;
+      }
+
+      return Math.floor(
+        (Date.now() - state.startTime) / 1000
+      );
+    }
+
+
+    /*
+     * =========================================================
+     * FALLBACK IMAGE
+     * =========================================================
+     *
+     * This makes the application still usable if the developer
+     * forgets to add assets/puzzle.jpg.
+     */
+
+    function createFallbackImage() {
+
+      const canvas =
+        document.createElement("canvas");
+
+      canvas.width = 1000;
+      canvas.height = 1000;
+
+      const ctx =
+        canvas.getContext("2d");
+
+      const gradient =
+        ctx.createLinearGradient(
+          0,
+          0,
+          1000,
+          1000
+        );
+
+      gradient.addColorStop(
+        0,
+        "#4f46e5"
+      );
+
+      gradient.addColorStop(
+        .5,
+        "#9333ea"
+      );
+
+      gradient.addColorStop(
+        1,
+        "#ec4899"
+      );
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1000, 1000);
+
+      ctx.fillStyle =
+        "rgba(255,255,255,.12)";
+
+      for (let i = 0; i < 12; i++) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+          Math.random() * 1000,
+          Math.random() * 1000,
+          80 + Math.random() * 160,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fill();
+      }
+
+      ctx.fillStyle = "white";
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      ctx.font =
+        "bold 100px system-ui";
+
+      ctx.fillText(
+        "PUZZLE",
+        500,
+        450
+      );
+
+      ctx.font =
+        "40px system-ui";
+
+      ctx.fillText(
+        "Add assets/puzzle.jpg",
+        500,
+        550
+      );
+
+      return canvas.toDataURL("image/jpeg", .9);
+    }
+
+
+    /*
+     * =========================================================
+     * IMAGE VALIDATION
+     * =========================================================
+     */
+
+    function validateImage(src) {
+
+      return new Promise(resolve => {
+
+        const img =
+          new Image();
+
+        img.onload = () => {
+          resolve(true);
+        };
+
+        img.onerror = () => {
+          resolve(false);
+        };
+
+        img.src = src;
+      });
+    }
+
+
+    /*
+     * =========================================================
+     * PUZZLE CREATION
+     * =========================================================
+     */
+
+    function createSolvedTiles() {
+
+      const total =
+        state.gridSize *
+        state.gridSize;
+
+      state.tiles =
+        Array.from(
+          { length: total },
+          (_, index) => index
+        );
+    }
+
+
+    function shuffleArray(array) {
+
+      /*
+       * Fisher-Yates shuffle.
+       */
+
+      const result =
+        [...array];
+
+      for (
+        let i = result.length - 1;
+        i > 0;
+        i--
+      ) {
+
+        const j =
+          Math.floor(
+            Math.random() * (i + 1)
+          );
+
+        [
+          result[i],
+          result[j]
+        ] = [
+          result[j],
+          result[i]
+        ];
+      }
+
+      return result;
+    }
+
+
+    function shufflePuzzle() {
+
+      let shuffled;
+
+      /*
+       * Avoid accidentally starting with the solved board.
+       */
+
+      do {
+
+        shuffled =
+          shuffleArray(
+            state.tiles
+          );
+
+      } while (
+        shuffled.every(
+          (value, index) =>
+            value === index
+        )
+      );
+
+      state.tiles =
+        shuffled;
+
+      state.selectedTile =
+        null;
+
+      state.moves = 0;
+
+      state.startTime = Date.now();
+
+      state.solved = false;
+
+      state.solutionVisible = false;
+
+      victoryOverlay.classList.add(
+        "hidden"
+      );
+
+      victoryOverlay.classList.remove(
+        "flex"
+      );
+
+      showSolutionButton.textContent =
+        "Show original image";
+
+      renderBoard();
+
+      startTimer();
+    }
+
+
+    /*
+     * =========================================================
+     * RENDER PUZZLE
+     * =========================================================
+     */
+
+    function renderBoard() {
+
+      board.innerHTML = "";
+
+      board.style.gridTemplateColumns =
+        `repeat(${state.gridSize}, minmax(0, 1fr))`;
+
+      const total =
+        state.gridSize *
+        state.gridSize;
+
+      const backgroundSize =
+        `${state.gridSize * 100}% ${state.gridSize * 100}%`;
+
+
+      state.tiles.forEach(
+        (originalIndex, currentIndex) => {
+
+          const tile =
+            document.createElement("button");
+
+          tile.type = "button";
+
+          tile.className =
+            "puzzle-tile focus:outline-none";
+
+          if (
+            state.selectedTile === currentIndex
+          ) {
+
+            tile.classList.add(
+              "selected"
+            );
+          }
+
+
+          const originalRow =
+            Math.floor(
+              originalIndex /
+              state.gridSize
+            );
+
+          const originalColumn =
+            originalIndex %
+            state.gridSize;
+
+
+          /*
+           * CSS background positioning creates the
+           * individual image slices without having to
+           * physically crop the image.
+           */
+
+          tile.style.backgroundImage =
+            `url("${state.imageSrc}")`;
+
+          tile.style.backgroundSize =
+            backgroundSize;
+
+          tile.style.backgroundPosition =
+            `${(
+              originalColumn *
+              100 /
+              (state.gridSize - 1)
+            ) || 0}% ${(
+              originalRow *
+              100 /
+              (state.gridSize - 1)
+            ) || 0}%`;
+
+
+          tile.setAttribute(
+            "aria-label",
+            `Puzzle tile ${currentIndex + 1}`
+          );
+
+
+          tile.addEventListener(
+            "click",
+            () => handleTileClick(currentIndex)
+          );
+
+
+          /*
+           * Basic drag-and-drop support for desktop.
+           */
+
+          tile.draggable = true;
+
+          tile.addEventListener(
+            "dragstart",
+            event => {
+
+              event.dataTransfer.setData(
+                "text/plain",
+                currentIndex
+              );
+
+              tile.classList.add(
+                "dragging"
+              );
+            }
+          );
+
+
+          tile.addEventListener(
+            "dragend",
+            () => {
+
+              tile.classList.remove(
+                "dragging"
+              );
+            }
+          );
+
+
+          tile.addEventListener(
+            "dragover",
+            event => {
+              event.preventDefault();
+            }
+          );
+
+
+          tile.addEventListener(
+            "drop",
+            event => {
+
+              event.preventDefault();
+
+              const from =
+                Number(
+                  event.dataTransfer.getData(
+                    "text/plain"
+                  )
+                );
+
+              swapTiles(
+                from,
+                currentIndex
+              );
+            }
+          );
+
+
+          board.appendChild(tile);
+        }
+      );
+
+      updateStats();
+    }
+
+
+    /*
+     * =========================================================
+     * TILE INTERACTION
+     * =========================================================
+     */
+
+    function handleTileClick(index) {
+
+      if (state.solved) {
+        return;
+      }
+
+      /*
+       * First selected tile.
+       */
+
+      if (
+        state.selectedTile === null
+      ) {
+
+        state.selectedTile =
+          index;
+
+        renderBoard();
+
+        return;
+      }
+
+
+      /*
+       * Clicking the same tile deselects it.
+       */
+
+      if (
+        state.selectedTile === index
+      ) {
+
+        state.selectedTile =
+          null;
+
+        renderBoard();
+
+        return;
+      }
+
+
+      /*
+       * Second tile -> swap.
+       */
+
+      swapTiles(
+        state.selectedTile,
+        index
+      );
+    }
+
+
+    function swapTiles(
+      first,
+      second
+    ) {
+
+      if (
+        first === second ||
+        state.solved
+      ) {
+        return;
+      }
+
+      [
+        state.tiles[first],
+        state.tiles[second]
+      ] = [
+        state.tiles[second],
+        state.tiles[first]
+      ];
+
+      state.moves++;
+
+      state.selectedTile =
+        null;
+
+      renderBoard();
+
+      checkSolved();
+    }
+
+
+    function checkSolved() {
+
+      const solved =
+        state.tiles.every(
+          (tile, index) =>
+            tile === index
+        );
+
+      if (!solved) {
+        return;
+      }
+
+      state.solved = true;
+
+      stopTimer();
+
+      const elapsed =
+        getElapsedSeconds();
+
+      victoryText.textContent =
+        `Solved in ${state.moves} moves and ${formatTime(elapsed)}.`;
+
+      victoryOverlay.classList.remove(
+        "hidden"
+      );
+
+      victoryOverlay.classList.add(
+        "flex"
+      );
+    }
+
+
+    /*
+     * =========================================================
+     * NEW PUZZLE
+     * =========================================================
+     */
+
+    function startNewPuzzle() {
+
+      createSolvedTiles();
+
+      shufflePuzzle();
+
+      puzzleTitle.textContent =
+        state.imageTitle;
+
+      sizeStat.textContent =
+        `${state.gridSize}×${state.gridSize}`;
+
+      window.scrollTo({
+        top:
+          document.getElementById(
+            "puzzle"
+          ).offsetTop - 80,
+        behavior: "smooth"
+      });
+    }
+
+
+    /*
+     * =========================================================
+     * LOAD IMAGE
+     * =========================================================
+     */
+
+    async function loadPuzzleImage(
+      src,
+      title = "Custom Picture"
+    ) {
+
+      const valid =
+        await validateImage(src);
+
+      if (!valid) {
+
+        console.warn(
+          "Default image could not be loaded."
+        );
+
+        state.imageSrc =
+          createFallbackImage();
+
+        state.imageTitle =
+          "Featured Picture";
+
+      } else {
+
+        state.imageSrc =
+          src;
+
+        state.imageTitle =
+          title;
+      }
+
+      puzzleTitle.textContent =
+        state.imageTitle;
+
+      createSolvedTiles();
+
+      shufflePuzzle();
+    }
+
+
+    /*
+     * =========================================================
+     * FILE UPLOAD
+     * =========================================================
+     */
+
+    function handleImageFile(file) {
+
+      if (!file) {
+        return;
+      }
+
+      /*
+       * Security / UX limit.
+       */
+
+      if (
+        !file.type.startsWith("image/")
+      ) {
+
+        showUploadMessage(
+          "Please choose a valid image file.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      if (
+        file.size >
+        5 * 1024 * 1024
+      ) {
+
+        showUploadMessage(
+          "Please choose an image smaller than 5 MB.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      const reader =
+        new FileReader();
+
+
+      reader.onload = async event => {
+
+        const imageSrc =
+          event.target.result;
+
+        const title =
+          file.name
+            .replace(/\.[^/.]+$/, "")
+            .slice(0, 50);
+
+
+        /*
+         * Save the image in the browser.
+         */
+
+        saveToLibrary(
+          imageSrc,
+          title
+        );
+
+
+        /*
+         * Immediately make it playable.
+         */
+
+        await loadPuzzleImage(
+          imageSrc,
+          title
+        );
+
+
+        showUploadMessage(
+          "Image added to your puzzle library!",
+          "success"
+        );
+
+        renderLibrary();
+      };
+
+
+      reader.onerror = () => {
+
+        showUploadMessage(
+          "Unable to read this image.",
+          "error"
+        );
+      };
+
+
+      reader.readAsDataURL(file);
+    }
+
+
+    function showUploadMessage(
+      message,
+      type
+    ) {
+
+      uploadMessage.textContent =
+        message;
+
+      uploadMessage.className =
+        "mt-3 rounded-xl px-3 py-2 text-xs";
+
+
+      if (type === "success") {
+
+        uploadMessage.classList.add(
+          "bg-emerald-500/10",
+          "text-emerald-400"
+        );
+
+      } else {
+
+        uploadMessage.classList.add(
+          "bg-red-500/10",
+          "text-red-400"
+        );
+      }
+
+
+      uploadMessage.classList.remove(
+        "hidden"
+      );
+
+
+      setTimeout(() => {
+
+        uploadMessage.classList.add(
+          "hidden"
+        );
+
+      }, 3500);
+    }
+
+
+    /*
+     * =========================================================
+     * LOCALSTORAGE LIBRARY
+     * =========================================================
+     */
+
+    function getLibrary() {
+
+      try {
+
+        return JSON.parse(
+          localStorage.getItem(
+            STORAGE_KEY
+          ) || "[]"
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Could not read puzzle library.",
+          error
+        );
+
+        return [];
+      }
+    }
+
+
+    function saveToLibrary(
+      image,
+      title
+    ) {
+
+      const library =
+        getLibrary();
+
+
+      /*
+       * Avoid saving exact duplicate images.
+       */
+
+      const duplicate =
+        library.some(
+          item =>
+            item.image === image
+        );
+
+
+      if (duplicate) {
+        return;
+      }
+
+
+      const item = {
+        id:
+          Date.now().toString() +
+          Math.random()
+            .toString(36)
+            .slice(2),
+
+        title:
+          title || "My Picture",
+
+        image,
+
+        createdAt:
+          new Date().toISOString()
+      };
+
+
+      library.unshift(item);
+
+
+      /*
+       * Keep the library reasonably small.
+       *
+       * LocalStorage is usually limited to around 5 MB,
+       * although exact limits vary by browser.
+       */
+
+      const limitedLibrary =
+        library.slice(0, 12);
+
+
+      try {
+
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(
+            limitedLibrary
+          )
+        );
+
+      } catch (error) {
+
+        console.warn(
+          "LocalStorage limit reached.",
+          error
+        );
+
+        showUploadMessage(
+          "The browser library is full. Delete an old image and try again.",
+          "error"
+        );
+      }
+    }
+
+
+    function deleteFromLibrary(id) {
+
+      const library =
+        getLibrary();
+
+      const updated =
+        library.filter(
+          item =>
+            item.id !== id
+        );
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(updated)
+      );
+
+      renderLibrary();
+    }
+
+
+    function renderLibrary() {
+
+      const library =
+        getLibrary();
+
+
+      libraryGrid.innerHTML = "";
+
+
+      if (!library.length) {
+
+        emptyLibrary.classList.remove(
+          "hidden"
+        );
+
+        libraryGrid.classList.add(
+          "hidden"
+        );
+
+        clearLibraryButton.classList.add(
+          "hidden"
+        );
+
+        return;
+      }
+
+
+      emptyLibrary.classList.add(
+        "hidden"
+      );
+
+      libraryGrid.classList.remove(
+        "hidden"
+      );
+
+      clearLibraryButton.classList.remove(
+        "hidden"
+      );
+
+
+      library.forEach(item => {
+
+        const card =
+          document.createElement("article");
+
+        card.className =
+          "glass group overflow-hidden rounded-2xl animate-fade-in";
+
+
+        card.innerHTML = `
+          <div class="relative">
+
+            <img
+              src="${item.image}"
+              alt="${escapeHtml(item.title)}"
+              class="library-image w-full"
+            >
+
+            <button
+              type="button"
+              data-delete="${item.id}"
+              aria-label="Delete ${escapeHtml(item.title)}"
+              class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-sm backdrop-blur transition hover:bg-red-500"
+            >
+              ×
+            </button>
+
+          </div>
+
+          <div class="p-4">
+
+            <h3 class="truncate font-semibold">
+              ${escapeHtml(item.title)}
+            </h3>
+
+            <div class="mt-3 flex gap-2">
+
+              <button
+                type="button"
+                data-play="${item.id}"
+                class="flex-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-zinc-900 transition hover:bg-zinc-200 active:scale-95"
+              >
+                Play
+              </button>
+
+            </div>
+
+          </div>
+        `;
+
+
+        /*
+         * Delete button
+         */
+
+        card
+          .querySelector(
+            "[data-delete]"
+          )
+          .addEventListener(
+            "click",
+            () => {
+
+              deleteFromLibrary(
+                item.id
+              );
+            }
+          );
+
+
+        /*
+         * Play button
+         */
+
+        card
+          .querySelector(
+            "[data-play]"
+          )
+          .addEventListener(
+            "click",
+            async () => {
+
+              await loadPuzzleImage(
+                item.image,
+                item.title
+              );
+
+              document
+                .getElementById(
+                  "puzzle"
+                )
+                .scrollIntoView({
+                  behavior: "smooth"
+                });
+            }
+          );
+
+
+        libraryGrid.appendChild(
+          card
+        );
+      });
+    }
+
+
+    /*
+     * Prevent titles from being interpreted as HTML.
+     */
+
+    function escapeHtml(value) {
+
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+
+    /*
+     * =========================================================
+     * SOLUTION PREVIEW
+     * =========================================================
+     */
+
+    function toggleSolution() {
+
+      state.solutionVisible =
+        !state.solutionVisible;
+
+
+      if (
+        state.solutionVisible
+      ) {
+
+        board.style.backgroundImage =
+          `url("${state.imageSrc}")`;
+
+        board.style.backgroundSize =
+          "cover";
+
+        board.style.backgroundPosition =
+          "center";
+
+        board.style.backgroundRepeat =
+          "no-repeat";
+
+        /*
+         * Temporarily hide puzzle tiles.
+         */
+
+        [...board.children].forEach(
+          tile => {
+            tile.style.visibility =
+              "hidden";
+          }
+        );
+
+        showSolutionButton.textContent =
+          "Hide original image";
+
+      } else {
+
+        board.style.backgroundImage =
+          "";
+
+        [...board.children].forEach(
+          tile => {
+            tile.style.visibility =
+              "visible";
+          }
+        );
+
+        showSolutionButton.textContent =
+          "Show original image";
+      }
+    }
+
+
+    /*
+     * =========================================================
+     * EVENT LISTENERS
+     * =========================================================
+     */
+
+
+    difficulty.addEventListener(
+      "change",
+      () => {
+
+        state.gridSize =
+          Number(
+            difficulty.value
+          );
+
+        startNewPuzzle();
+      }
+    );
+
+
+    shuffleButton.addEventListener(
+      "click",
+      () => {
+
+        createSolvedTiles();
+
+        shufflePuzzle();
+      }
+    );
+
+
+    newPuzzleNavButton.addEventListener(
+      "click",
+      () => {
+
+        createSolvedTiles();
+
+        shufflePuzzle();
+
+        document
+          .getElementById(
+            "puzzle"
+          )
+          .scrollIntoView({
+            behavior: "smooth"
+          });
+      }
+    );
+
+
+    playAgainButton.addEventListener(
+      "click",
+      () => {
+
+        createSolvedTiles();
+
+        shufflePuzzle();
+      }
+    );
+
+
+    showSolutionButton.addEventListener(
+      "click",
+      toggleSolution
+    );
+
+
+    /*
+     * Upload button.
+     */
+
+    chooseImageButton.addEventListener(
+      "click",
+      event => {
+
+        event.stopPropagation();
+
+        imageInput.click();
+      }
+    );
+
+
+    uploadZone.addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target ===
+          chooseImageButton
+        ) {
+          return;
+        }
+
+        imageInput.click();
+      }
+    );
+
+
+    imageInput.addEventListener(
+      "change",
+      event => {
+
+        const file =
+          event.target.files[0];
+
+        handleImageFile(file);
+
+        /*
+         * Allows selecting the same file again.
+         */
+
+        imageInput.value = "";
+      }
+    );
+
+
+    /*
+     * Drag-and-drop upload.
+     */
+
+    [
+      "dragenter",
+      "dragover"
+    ].forEach(eventName => {
+
+      uploadZone.addEventListener(
+        eventName,
+        event => {
+
+          event.preventDefault();
+
+          event.stopPropagation();
+
+          uploadZone.classList.add(
+            "drag-over"
+          );
+        }
+      );
+    });
+
+
+    [
+      "dragleave",
+      "drop"
+    ].forEach(eventName => {
+
+      uploadZone.addEventListener(
+        eventName,
+        event => {
+
+          event.preventDefault();
+
+          event.stopPropagation();
+
+          uploadZone.classList.remove(
+            "drag-over"
+          );
+        }
+      );
+    });
+
+
+    uploadZone.addEventListener(
+      "drop",
+      event => {
+
+        const file =
+          event.dataTransfer.files[0];
+
+        handleImageFile(file);
+      }
+    );
+
+
+    /*
+     * Clear library.
+     */
+
+    clearLibraryButton.addEventListener(
+      "click",
+      () => {
+
+        const confirmed =
+          confirm(
+            "Delete all saved puzzle images from this browser?"
+          );
+
+        if (!confirmed) {
+          return;
+        }
+
+        localStorage.removeItem(
+          STORAGE_KEY
+        );
+
+        renderLibrary();
+      }
+    );
+
+
+    /*
+     * =========================================================
+     * INITIALIZATION
+     * =========================================================
+     */
+
+    async function initialize() {
+
+      document.getElementById(
+        "currentYear"
+      ).textContent =
+        new Date().getFullYear();
+
+
+      /*
+       * Render previously saved images.
+       */
+
+      renderLibrary();
+
+
+      /*
+       * Load default repository image.
+       */
+
+      await loadPuzzleImage(
+        DEFAULT_IMAGE,
+        "Featured Picture"
+      );
+    }
+
+
+    initialize();
+
+  </script>
+
+</body>
+</html>
